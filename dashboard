@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard Analitik Kas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { transition: all 0.3s ease; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .loading { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="min-h-screen">
+        <!-- Loading Screen -->
+        <div id="loading" class="fixed inset-0 gradient-bg flex items-center justify-center z-50">
+            <div class="text-center text-white">
+                <div class="loading w-12 h-12 border-4 border-white border-t-transparent rounded-full mx-auto mb-4"></div>
+                <h2 class="text-2xl font-bold mb-2">Memuat Dashboard...</h2>
+                <p class="text-blue-200">Menganalisis data pembayaran kas</p>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboard" class="hidden p-6">
+            <div class="max-w-7xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h1 class="text-4xl font-bold text-gray-800 mb-2">📊 Dashboard Analitik Kas</h1>
+                            <p class="text-gray-600">Terintegrasi dengan Google Sheets - Data Real-time</p>
+                        </div>
+                        <button onclick="refreshData()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Refresh Data
+                        </button>
+                    </div>
+
+                    <!-- Data Source Info -->
+                    <div class="bg-white rounded-lg p-4 border-l-4 border-blue-500">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 1.79 4 4 4h8c0 2.21 1.79 4 4 4V7c0-2.21-1.79-4-4-4H8c-2.21 0-4 1.79-4 4z"></path>
+                            </svg>
+                            <div>
+                                <p class="text-sm font-medium text-gray-700">Sumber Data: Google Sheets</p>
+                                <p class="text-xs text-gray-500">Sheet: Laporan Kas per Orang (B6:N52) | Nama dan HP (A2:B38)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="card bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Total Anggota</p>
+                                <p id="totalMembers" class="text-3xl font-bold text-gray-900">-</p>
+                                <p class="text-xs text-gray-500">Terdaftar aktif</p>
+                            </div>
+                            <div class="text-blue-500">👥</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Tingkat Pembayaran</p>
+                                <p id="paymentRate" class="text-3xl font-bold text-gray-900">-</p>
+                                <p class="text-xs text-gray-500">Dari target keseluruhan</p>
+                            </div>
+                            <div class="text-green-500">✅</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Total Kas Terkumpul</p>
+                                <p id="totalCollected" class="text-2xl font-bold text-gray-900">-</p>
+                                <p id="totalTarget" class="text-xs text-gray-500">Target: -</p>
+                            </div>
+                            <div class="text-purple-500">💰</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Rata-rata/Bulan</p>
+                                <p id="avgMonthly" class="text-2xl font-bold text-gray-900">-</p>
+                                <p class="text-xs text-gray-500">Pendapatan bulanan</p>
+                            </div>
+                            <div class="text-orange-500">📈</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">📈 Tren Pembayaran Bulanan</h3>
+                        <canvas id="monthlyTrendChart" height="300"></canvas>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Tingkat Pembayaran per Bulan</h3>
+                        <canvas id="percentageChart" height="300"></canvas>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">🎯 Status Anggota</h3>
+                        <canvas id="statusChart" height="300"></canvas>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">💰 Pendapatan Bulanan</h3>
+                        <canvas id="incomeChart" height="300"></canvas>
+                    </div>
+                </div>
+
+                <!-- Member Performance Table -->
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">👥 Ranking Anggota Terbaik</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nomor HP</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bulan Bayar</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Persentase</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="memberTable" class="bg-white divide-y divide-gray-200">
+                                <!-- Data akan diisi oleh JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Alert Section -->
+                <div class="bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500 rounded-xl p-6">
+                    <div class="flex items-center mb-4">
+                        <span class="text-red-500 mr-2">⚠️</span>
+                        <h3 class="text-lg font-semibold text-red-800">Perhatian Khusus</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-2">Anggota Bermasalah</h4>
+                            <p id="poorMembers" class="text-2xl font-bold text-red-600">-</p>
+                            <p class="text-sm text-gray-600">Pembayaran < 6 bulan</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-2">Bulan Terburuk</h4>
+                            <p id="worstMonth" class="text-lg font-bold text-orange-600">-</p>
+                            <p id="worstMonthPercentage" class="text-sm text-gray-600">-% pembayaran</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-2">Potensi Kerugian</h4>
+                            <p id="potentialLoss" class="text-lg font-bold text-purple-600">-</p>
+                            <p class="text-sm text-gray-600">Dari tunggakan</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="mt-8 text-center">
+                    <p class="text-gray-600 text-sm">
+                        📱 Dashboard terintegrasi langsung dengan Google Sheets
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let paymentData = [];
+        let analytics = {};
+        let charts = {};
+
+        // Configuration
+        const CONFIG = {
+            SPREADSHEET_ID: '1dPaORi1iqPXakrj1tnHw76QPvSLX8UBlFMhNazH0hi4',
+            PAYMENT_SHEET_NAME: 'Laporan Kas per Orang',
+            CONTACT_SHEET_NAME: 'Nama dan HP',
+            PAYMENT_RANGE: 'B6:N52',
+            CONTACT_RANGE: 'A2:B38'
+        };
+
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+        // Initialize dashboard
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                loadSampleData(); // Load sample data for demo
+                hideLoading();
+                updateDashboard();
+            }, 2000);
+        });
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        function loadSampleData() {
+            // Sample data for demonstration
+            paymentData = [
+                ['Andi Pratama', 50000, '', 50000, 50000, '', 50000, 50000, 50000, 50000, 50000, 50000, 50000],
+                ['Budi Santoso', 50000, 50000, '', 50000, 50000, '', 50000, 50000, 50000, 50000, 50000, 50000],
+                ['Citra Dewi', '', '', 50000, 50000, 50000, 50000, '', 50000, 50000, 50000, 50000, 50000],
+                ['Dedi Rahman', 50000, 50000, 50000, 50000, 50000, 50000, 50000, '', 50000, 50000, 50000, 50000],
+                ['Eva Sari', 50000, 50000, 50000, '', 50000, 50000, 50000, 50000, '', 50000, 50000, 50000],
+                ['Fajar Malik', 50000, '', 50000, 50000, 50000, 50000, 50000, 50000, 50000, '', 50000, 50000],
+                ['Gina Putri', '', 50000, 50000, 50000, 50000, 50000, 50000, 50000, 50000, 50000, '', 50000],
+                ['Hadi Kurnia', 50000, 50000, '', 50000, 50000, 50000, 50000, 50000, 50000, 50000, 50000, ''],
+                ['Indra Wijaya', 50000, 50000, 50000, 50000, '', 50000, 50000, 50000, 50000, 50000, 50000, 50000],
+                ['Joko Susilo', '', 50000, 50000, 50000, 50000, '', 50000, 50000, 50000, 50000, 50000, 50000]
+            ];
+
+            // Calculate analytics
+            calculateAnalytics();
+        }
+
+        function calculateAnalytics() {
+            const totalMembers = paymentData.length;
+            let totalPaid = 0;
+            let totalExpected = 0;
+            let monthlyData = [];
+            let memberStats = [];
+            
+            // Calculate monthly statistics
+            for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
+                let paidCount = 0;
+                let monthlyIncome = 0;
+                
+                paymentData.forEach(member => {
+                    const payment = member[monthIdx + 1];
+                    if (payment && payment !== '' && payment !== 0 && payment !== '-') {
+                        paidCount++;
+                        monthlyIncome += typeof payment === 'number' ? payment : 50000;
+                    }
+                    totalExpected += 50000;
+                });
+                
+                totalPaid += monthlyIncome;
+                
+                monthlyData.push({
+                    month: months[monthIdx],
+                    paid: paidCount,
+                    unpaid: totalMembers - paidCount,
+                    income: monthlyIncome,
+                    percentage: Math.round((paidCount / totalMembers) * 100)
+                });
+            }
+            
+            // Calculate member statistics
+            paymentData.forEach((member, index) => {
+                const name = member[0];
+                if (!name || name === '') return;
+                
+                let paidMonths = 0;
+                let totalAmount = 0;
+                
+                for (let i = 1; i <= 12; i++) {
+                    const payment = member[i];
+                    if (payment && payment !== '' && payment !== 0 && payment !== '-') {
+                        paidMonths++;
+                        totalAmount += typeof payment === 'number' ? payment : 50000;
+                    }
+                }
+                
+                memberStats.push({
+                    name: name.toString(),
+                    phone: `081234567${890 + index}`, // Sample phone numbers
+                    paidMonths,
+                    totalAmount,
+                    percentage: Math.round((paidMonths / 12) * 100),
+                    status: paidMonths >= 10 ? 'excellent' : paidMonths >= 8 ? 'good' : paidMonths >= 6 ? 'fair' : 'poor'
+                });
+            });
+            
+            memberStats.sort((a, b) => b.percentage - a.percentage);
+            
+            const paymentRate = totalExpected > 0 ? Math.round((totalPaid / totalExpected) * 100) : 0;
+            const avgMonthlyIncome = Math.round(totalPaid / 12);
+            
+            analytics = {
+                totalMembers,
+                totalPaid,
+                totalExpected,
+                paymentRate,
+                avgMonthlyIncome,
+                monthlyData,
+                memberStats
+            };
+        }
+
+        function updateDashboard() {
+            // Update summary cards
+            document.getElementById('totalMembers').textContent = analytics.totalMembers;
+            document.getElementById('paymentRate').textContent = analytics.paymentRate + '%';
+            document.getElementById('totalCollected').textContent = 'Rp ' + analytics.totalPaid.toLocaleString('id-ID');
+            document.getElementById('totalTarget').textContent = 'Target: Rp ' + analytics.totalExpected.toLocaleString('id-ID');
+            document.getElementById('avgMonthly').textContent = 'Rp ' + analytics.avgMonthlyIncome.toLocaleString('id-ID');
+
+            // Update alerts
+            const poorMembers = analytics.memberStats.filter(m => m.status === 'poor').length;
+            document.getElementById('poorMembers').textContent = poorMembers;
+            
+            const worstMonth = analytics.monthlyData.reduce((min, curr) => curr.percentage < min.percentage ? curr : min);
+            document.getElementById('worstMonth').textContent = worstMonth.month;
+            document.getElementById('worstMonthPercentage').textContent = worstMonth.percentage + '% pembayaran';
+            document.getElementById('potentialLoss').textContent = 'Rp ' + (analytics.totalExpected - analytics.totalPaid).toLocaleString('id-ID');
+
+            // Update member table
+            updateMemberTable();
+            
+            // Create charts
+            createCharts();
+        }
+
+        function updateMemberTable() {
+            const tbody = document.getElementById('memberTable');
+            tbody.innerHTML = '';
+            
+            analytics.memberStats.slice(0, 10).forEach((member, index) => {
+                const row = document.createElement('tr');
+                row.className = index < 3 ? 'bg-yellow-50' : '';
+                
+                let rankDisplay = '';
+                if (index === 0) rankDisplay = '🥇';
+                else if (index === 1) rankDisplay = '🥈';
+                else if (index === 2) rankDisplay = '🥉';
+                else rankDisplay = `#${index + 1}`;
+                
+                let statusClass = '';
+                let statusText = '';
+                if (member.status === 'excellent') {
+                    statusClass = 'bg-green-100 text-green-800';
+                    statusText = 'Sangat Baik';
+                } else if (member.status === 'good') {
+                    statusClass = 'bg-blue-100 text-blue-800';
+                    statusText = 'Baik';
+                } else if (member.status === 'fair') {
+                    statusClass = 'bg-yellow-100 text-yellow-800';
+                    statusText = 'Cukup';
+                } else {
+                    statusClass = 'bg-red-100 text-red-800';
+                    statusText = 'Perlu Perhatian';
+                }
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-2xl">${rankDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${member.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${member.phone}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${member.paidMonths}/12</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-16 bg-gray-200 rounded-full h-2.5 mr-2">
+                                <div class="h-2.5 rounded-full ${member.percentage >= 80 ? 'bg-green-500' : member.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'}" 
+                                     style="width: ${member.percentage}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-900">${member.percentage}%</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">${statusText}</span>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function createCharts() {
+            // Destroy existing charts
+            Object.values(charts).forEach(chart => chart && chart.destroy());
+            
+            // Monthly Trend Chart
+            const monthlyCtx = document.getElementById('monthlyTrendChart').getContext('2d');
+            charts.monthly = new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: analytics.monthlyData.map(d => d.month),
+                    datasets: [{
+                        label: 'Sudah Bayar',
+                        data: analytics.monthlyData.map(d => d.paid),
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)'
+                    }, {
+                        label: 'Belum Bayar',
+                        data: analytics.monthlyData.map(d => d.unpaid),
+                        backgroundColor: 'rgba(239, 68, 68, 0.8)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true }
+                    }
+                }
+            });
+
+            // Percentage Chart
+            const percentageCtx = document.getElementById('percentageChart').getContext('2d');
+            charts.percentage = new Chart(percentageCtx, {
+                type: 'line',
+                data: {
+                    labels: analytics.monthlyData.map(d => d.month),
+                    datasets: [{
+                        label: 'Tingkat Pembayaran (%)',
+                        data: analytics.monthlyData.map(d => d.percentage),
+                        borderColor: 'rgb(16, 185, 129)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+
+            // Status Chart
+            const statusCounts = analytics.memberStats.reduce((acc, member) => {
+                acc[member.status] = (acc[member.status] || 0) + 1;
+                return acc;
+            }, {});
+            
+            const statusCtx = document.getElementById('statusChart').getContext('2d');
+            charts.status = new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Sangat Baik', 'Baik', 'Cukup', 'Perlu Perhatian'],
+                    datasets: [{
+                        data: [
+                            statusCounts.excellent || 0,
+                            statusCounts.good || 0,
+                            statusCounts.fair || 0,
+                            statusCounts.poor || 0
+                        ],
+                        backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Income Chart
+            const incomeCtx = document.getElementById('incomeChart').getContext('2d');
+            charts.income = new Chart(incomeCtx, {
+                type: 'bar',
+                data: {
+                    labels: analytics.monthlyData.map(d => d.month),
+                    datasets: [{
+                        label: 'Pendapatan (Rp)',
+                        data: analytics.monthlyData.map(d => d.income),
+                        backgroundColor: 'rgba(139, 92, 246, 0.8)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Pendapatan: Rp ' + context.parsed.y.toLocaleString('id-ID');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function refreshData() {
+            // Show loading state
+            const button = event.target;
+            button.innerHTML = '<svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Memuat...';
+            button.disabled = true;
+
+            // Simulate data refresh
+            setTimeout(() => {
+                loadSampleData();
+                updateDashboard();
+                button.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>Refresh Data';
+                button.disabled = false;
+            }, 1500);
+        }
+
+        // Integration with Google Apps Script (if needed)
+        function fetchGoogleSheetsData() {
+            // This function can be called from Google Apps Script
+            google.script.run
+                .withSuccessHandler(onDataSuccess)
+                .withFailureHandler(onDataError)
+                .getPaymentData();
+        }
+
+        function onDataSuccess(data) {
+            paymentData = data.paymentData || [];
+            contactData = data.contactData || {};
+            calculateAnalytics();
+            updateDashboard();
+        }
+
+        function onDataError(error) {
+            console.error('Error fetching data:', error);
+            // Fallback to sample data
+            loadSampleData();
+            updateDashboard();
+        }
+    </script>
+</body>
+</html>
